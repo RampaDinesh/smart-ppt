@@ -12,6 +12,8 @@ import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Footer } from "@/components/Footer";
+import { SlideOverview } from "@/components/SlideOverview";
+import { SlideEditDialog } from "@/components/SlideEditDialog";
 import {
   Presentation,
   ArrowLeft,
@@ -20,10 +22,11 @@ import {
   FileText,
   Download,
   Check,
+  Eye,
 } from "lucide-react";
 import pptxgen from "pptxgenjs";
 
-type GenerationStep = "input" | "generating" | "complete";
+type GenerationStep = "input" | "generating" | "overview" | "complete";
 
 interface SlideContent {
   title: string;
@@ -53,6 +56,11 @@ export default function Create() {
   const [sampleFile, setSampleFile] = useState<File | null>(null);
   const [sampleAnalysis, setSampleAnalysis] = useState<any>(null);
   const [analyzingFile, setAnalyzingFile] = useState(false);
+
+  // Slide editing state
+  const [editingSlideIndex, setEditingSlideIndex] = useState<number | null>(null);
+  const [isRegenerating, setIsRegenerating] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -110,12 +118,8 @@ export default function Create() {
       }
 
       setGeneratedContent(data.content);
-
-      // Generate and download PPT
-      await generatePPTFile(data.content, presData.id);
-
-      setStep("complete");
-      toast.success("Presentation generated successfully!");
+      setStep("overview");
+      toast.success("Presentation generated! Review and edit your slides.");
     } catch (error: any) {
       console.error("Generation error:", error);
       const errorMessage = error?.message || "Failed to generate presentation. Please try again.";
@@ -145,8 +149,6 @@ export default function Create() {
     setAnalyzingFile(true);
 
     try {
-      // For now, we'll simulate analysis with default structure
-      // In production, you'd send this to a backend for parsing
       await new Promise((resolve) => setTimeout(resolve, 1500));
 
       const mockAnalysis = {
@@ -220,17 +222,14 @@ export default function Create() {
       }
 
       setGeneratedContent(data.content);
-      await generatePPTFile(data.content, presData.id);
-
-      setStep("complete");
-      toast.success("Presentation generated successfully!");
+      setStep("overview");
+      toast.success("Presentation generated! Review and edit your slides.");
     } catch (error: any) {
       console.error("Generation error:", error);
       const errorMessage = error?.message || "Failed to generate presentation. Please try again.";
       toast.error(errorMessage);
       setStep("input");
 
-      // Update status to failed
       if (presentationId) {
         await supabase
           .from("presentations")
@@ -240,91 +239,162 @@ export default function Create() {
     }
   };
 
-  const generatePPTFile = async (content: GeneratedContent, presId: string) => {
-    const pptx = new pptxgen();
-    pptx.title = content.title;
-    pptx.author = "Smart PPT Generator";
+  const handleEditSlide = (index: number) => {
+    setEditingSlideIndex(index);
+  };
 
-    // Title slide
-    const titleSlide = pptx.addSlide();
-    titleSlide.addText(content.title, {
-      x: 0.5,
-      y: "40%",
-      w: "90%",
-      h: 1.5,
-      fontSize: 44,
-      bold: true,
-      align: "center",
-      color: "1e3a5f",
-    });
-    titleSlide.addText(`Generated with Smart PPT`, {
-      x: 0.5,
-      y: "60%",
-      w: "90%",
-      h: 0.5,
-      fontSize: 18,
-      align: "center",
-      color: "666666",
-    });
+  const handleDeleteSlide = (index: number) => {
+    if (!generatedContent || generatedContent.slides.length <= 1) {
+      toast.error("Cannot delete the last slide");
+      return;
+    }
 
-    // Content slides
-    content.slides.forEach((slide) => {
-      const s = pptx.addSlide();
-      s.addText(slide.title, {
+    const newSlides = generatedContent.slides.filter((_, i) => i !== index);
+    setGeneratedContent({ ...generatedContent, slides: newSlides });
+    toast.success("Slide deleted");
+  };
+
+  const handleRegenerateSlide = async (index: number, prompt: string) => {
+    if (!generatedContent) return;
+
+    setIsRegenerating(true);
+
+    try {
+      const { data, error } = await supabase.functions.invoke("regenerate-slide", {
+        body: {
+          currentSlide: generatedContent.slides[index],
+          editPrompt: prompt,
+          presentationTopic: topic,
+          audienceType,
+        },
+      });
+
+      if (error) {
+        throw new Error(error.message || "Failed to regenerate slide");
+      }
+
+      if (!data || !data.slide) {
+        throw new Error("No content received");
+      }
+
+      // Update the slide in the content
+      const newSlides = [...generatedContent.slides];
+      newSlides[index] = data.slide;
+      setGeneratedContent({ ...generatedContent, slides: newSlides });
+
+      toast.success("Slide updated successfully!");
+      setEditingSlideIndex(null);
+    } catch (error: any) {
+      console.error("Regenerate error:", error);
+      toast.error(error?.message || "Failed to regenerate slide");
+    } finally {
+      setIsRegenerating(false);
+    }
+  };
+
+  const handleDownload = async () => {
+    if (!generatedContent || !user || !presentationId) return;
+
+    setIsDownloading(true);
+
+    try {
+      const pptx = new pptxgen();
+      pptx.title = generatedContent.title;
+      pptx.author = "Smart PPT Generator";
+
+      // Title slide
+      const titleSlide = pptx.addSlide();
+      titleSlide.addText(generatedContent.title, {
         x: 0.5,
-        y: 0.5,
+        y: "40%",
         w: "90%",
-        h: 1,
-        fontSize: 32,
+        h: 1.5,
+        fontSize: 44,
         bold: true,
+        align: "center",
         color: "1e3a5f",
       });
-
-      const bulletText = slide.bullets.map((b) => ({
-        text: b,
-        options: { bullet: true, fontSize: 18, color: "333333" },
-      }));
-
-      s.addText(bulletText, {
-        x: 0.75,
-        y: 1.75,
-        w: "85%",
-        h: 4,
-        valign: "top",
+      titleSlide.addText(`Generated with Smart PPT`, {
+        x: 0.5,
+        y: "60%",
+        w: "90%",
+        h: 0.5,
+        fontSize: 18,
+        align: "center",
+        color: "666666",
       });
-    });
 
-    // Generate blob and upload
-    const blob = await pptx.write({ outputType: "blob" });
-    const fileName = `${user!.id}/${presId}.pptx`;
+      // Content slides (only the finalized ones)
+      generatedContent.slides.forEach((slide) => {
+        const s = pptx.addSlide();
+        s.addText(slide.title, {
+          x: 0.5,
+          y: 0.5,
+          w: "90%",
+          h: 1,
+          fontSize: 32,
+          bold: true,
+          color: "1e3a5f",
+        });
 
-    const { error: uploadError } = await supabase.storage
-      .from("presentations")
-      .upload(fileName, blob, { contentType: "application/vnd.openxmlformats-officedocument.presentationml.presentation" });
+        const bulletText = slide.bullets.map((b) => ({
+          text: b,
+          options: { bullet: true, fontSize: 18, color: "333333" },
+        }));
 
-    if (uploadError) throw uploadError;
+        s.addText(bulletText, {
+          x: 0.75,
+          y: 1.75,
+          w: "85%",
+          h: 4,
+          valign: "top",
+        });
+      });
 
-    const { data: urlData } = supabase.storage
-      .from("presentations")
-      .getPublicUrl(fileName);
+      // Generate blob and upload
+      const blob = await pptx.write({ outputType: "blob" });
+      const fileName = `${user.id}/${presentationId}.pptx`;
 
-    await supabase
-      .from("presentations")
-      .update({
-        file_url: urlData.publicUrl,
-        status: "completed",
-      })
-      .eq("id", presId);
+      const { error: uploadError } = await supabase.storage
+        .from("presentations")
+        .upload(fileName, blob, { 
+          contentType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+          upsert: true 
+        });
 
-    // Trigger download
-    const downloadUrl = URL.createObjectURL(blob as Blob);
-    const a = document.createElement("a");
-    a.href = downloadUrl;
-    a.download = `${content.title.replace(/[^a-z0-9]/gi, "_")}.pptx`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(downloadUrl);
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from("presentations")
+        .getPublicUrl(fileName);
+
+      await supabase
+        .from("presentations")
+        .update({
+          file_url: urlData.publicUrl,
+          status: "completed",
+          slide_count: generatedContent.slides.length + 1, // +1 for title slide
+        })
+        .eq("id", presentationId);
+
+      // Trigger download
+      const downloadUrl = URL.createObjectURL(blob as Blob);
+      const a = document.createElement("a");
+      a.href = downloadUrl;
+      a.download = `${generatedContent.title.replace(/[^a-z0-9]/gi, "_")}.pptx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(downloadUrl);
+
+      setStep("complete");
+      toast.success("Presentation downloaded!");
+    } catch (error: any) {
+      console.error("Download error:", error);
+      toast.error("Failed to download presentation");
+    } finally {
+      setIsDownloading(false);
+    }
   };
 
   if (loading) {
@@ -533,6 +603,81 @@ export default function Create() {
           </Card>
         )}
 
+        {step === "overview" && generatedContent && (
+          <div className="space-y-6">
+            {/* Overview Header */}
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="font-display text-2xl font-bold mb-1">Slide Overview</h2>
+                <p className="text-muted-foreground">
+                  Review your slides. Click the edit icon to modify or delete icon to remove.
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setStep("input");
+                    setTopic("");
+                    setGeneratedContent(null);
+                    setSampleFile(null);
+                    setSampleAnalysis(null);
+                  }}
+                >
+                  Start Over
+                </Button>
+                <Button
+                  variant="gradient"
+                  onClick={handleDownload}
+                  disabled={isDownloading}
+                >
+                  {isDownloading ? (
+                    <>
+                      <LoadingSpinner size="sm" className="mr-2" />
+                      Preparing...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="h-4 w-4 mr-2" />
+                      Download PPT
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            {/* Slides Grid */}
+            <SlideOverview
+              slides={generatedContent.slides}
+              presentationTitle={generatedContent.title}
+              onEditSlide={handleEditSlide}
+              onDeleteSlide={handleDeleteSlide}
+            />
+
+            {/* Bottom Actions */}
+            <div className="flex justify-center pt-4">
+              <Button
+                variant="gradient"
+                size="lg"
+                onClick={handleDownload}
+                disabled={isDownloading}
+              >
+                {isDownloading ? (
+                  <>
+                    <LoadingSpinner size="sm" className="mr-2" />
+                    Preparing Download...
+                  </>
+                ) : (
+                  <>
+                    <Download className="h-4 w-4 mr-2" />
+                    Download Final Presentation
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        )}
+
         {step === "complete" && generatedContent && (
           <Card className="text-center py-12">
             <CardContent className="space-y-6">
@@ -540,9 +685,9 @@ export default function Create() {
                 <Check className="h-8 w-8 text-green-600 dark:text-green-400" />
               </div>
               <div>
-                <h3 className="font-display text-2xl font-semibold mb-2">Presentation Ready!</h3>
+                <h3 className="font-display text-2xl font-semibold mb-2">Presentation Downloaded!</h3>
                 <p className="text-muted-foreground mb-6">
-                  Your presentation "{generatedContent.title}" has been generated and downloaded.
+                  Your presentation "{generatedContent.title}" has been saved and downloaded.
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -557,6 +702,7 @@ export default function Create() {
                     setGeneratedContent(null);
                     setSampleFile(null);
                     setSampleAnalysis(null);
+                    setPresentationId(null);
                   }}
                 >
                   Create Another
@@ -564,6 +710,20 @@ export default function Create() {
               </div>
             </CardContent>
           </Card>
+        )}
+
+        {/* Edit Dialog */}
+        {editingSlideIndex !== null && generatedContent && (
+          <SlideEditDialog
+            open={editingSlideIndex !== null}
+            onOpenChange={(open) => {
+              if (!open) setEditingSlideIndex(null);
+            }}
+            slideIndex={editingSlideIndex}
+            currentSlide={generatedContent.slides[editingSlideIndex]}
+            onRegenerateSlide={handleRegenerateSlide}
+            isRegenerating={isRegenerating}
+          />
         )}
       </main>
 
