@@ -9,17 +9,28 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Footer } from "@/components/Footer";
 import { toast } from "sonner";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Presentation,
   Plus,
   Download,
   Clock,
   FileText,
   LogOut,
-  Settings,
   Sparkles,
   Upload,
   LayoutDashboard,
   ShieldCheck,
+  Trash2,
+  Eye,
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -40,6 +51,9 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [presentations, setPresentations] = useState<PresentationRecord[]>([]);
   const [loadingPresentations, setLoadingPresentations] = useState(true);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [presentationToDelete, setPresentationToDelete] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -73,6 +87,33 @@ export default function Dashboard() {
     await signOut();
     navigate("/");
     toast.success("Signed out successfully");
+  };
+
+  const handleDeletePresentation = async () => {
+    if (!presentationToDelete) return;
+    
+    setIsDeleting(true);
+    try {
+      const { error } = await supabase
+        .from("presentations")
+        .delete()
+        .eq("id", presentationToDelete);
+      
+      if (error) throw error;
+      
+      setPresentations(presentations.filter(p => p.id !== presentationToDelete));
+      toast.success("Presentation deleted");
+    } catch (error) {
+      toast.error("Failed to delete presentation");
+    } finally {
+      setIsDeleting(false);
+      setDeleteDialogOpen(false);
+      setPresentationToDelete(null);
+    }
+  };
+
+  const handleOpenPresentation = (pres: PresentationRecord) => {
+    navigate(`/create?edit=${pres.id}`);
   };
 
   const getStatusColor = (status: string) => {
@@ -218,7 +259,11 @@ export default function Dashboard() {
           ) : (
             <div className="grid gap-4">
               {presentations.map((pres) => (
-                <Card key={pres.id} className="hover:shadow-soft transition-shadow">
+                <Card 
+                  key={pres.id} 
+                  className="hover:shadow-soft transition-shadow cursor-pointer group"
+                  onClick={() => handleOpenPresentation(pres)}
+                >
                   <CardContent className="p-6">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">
@@ -243,16 +288,42 @@ export default function Dashboard() {
                         <Badge className={getStatusColor(pres.status)}>
                           {pres.status}
                         </Badge>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenPresentation(pres);
+                          }}
+                        >
+                          <Eye className="h-4 w-4 mr-1" />
+                          View
+                        </Button>
                         {pres.status === "completed" && pres.file_url && (
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => window.open(pres.file_url!, "_blank")}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              window.open(pres.file_url!, "_blank");
+                            }}
                           >
                             <Download className="h-4 w-4 mr-1" />
                             Download
                           </Button>
                         )}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPresentationToDelete(pres.id);
+                            setDeleteDialogOpen(true);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
                   </CardContent>
@@ -264,6 +335,28 @@ export default function Dashboard() {
       </main>
 
       <Footer />
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Presentation?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete your presentation.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeletePresentation}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
