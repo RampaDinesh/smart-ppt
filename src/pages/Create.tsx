@@ -22,15 +22,17 @@ import {
   FileText,
   Download,
   Check,
-  Eye,
+  FileImage,
 } from "lucide-react";
 import pptxgen from "pptxgenjs";
+import { jsPDF } from "jspdf";
 
 type GenerationStep = "input" | "generating" | "overview" | "complete";
 
 interface SlideContent {
   title: string;
   bullets: string[];
+  imageUrl?: string;
 }
 
 interface GeneratedContent {
@@ -61,6 +63,8 @@ export default function Create() {
   const [editingSlideIndex, setEditingSlideIndex] = useState<number | null>(null);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadFormat, setDownloadFormat] = useState<"pptx" | "pdf" | null>(null);
+  const [isGeneratingImages, setIsGeneratingImages] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -292,15 +296,58 @@ export default function Create() {
     }
   };
 
-  const handleDownload = async () => {
+  const generateSlideImages = async (): Promise<SlideContent[]> => {
+    if (!generatedContent) return [];
+    
+    setIsGeneratingImages(true);
+    const slidesWithImages: SlideContent[] = [];
+    
+    for (const slide of generatedContent.slides) {
+      try {
+        // Skip if already has an image
+        if (slide.imageUrl) {
+          slidesWithImages.push(slide);
+          continue;
+        }
+        
+        const { data, error } = await supabase.functions.invoke("generate-slide-image", {
+          body: {
+            slideTitle: slide.title,
+            slideBullets: slide.bullets,
+            presentationTopic: topic,
+          },
+        });
+        
+        if (error || !data?.success) {
+          console.error("Image generation failed for slide:", slide.title);
+          slidesWithImages.push(slide); // Continue without image
+        } else {
+          slidesWithImages.push({ ...slide, imageUrl: data.imageUrl });
+        }
+      } catch (err) {
+        console.error("Error generating image:", err);
+        slidesWithImages.push(slide);
+      }
+    }
+    
+    setIsGeneratingImages(false);
+    return slidesWithImages;
+  };
+
+  const handleDownloadPPTX = async () => {
     if (!generatedContent || !user || !presentationId) return;
 
     setIsDownloading(true);
+    setDownloadFormat("pptx");
 
     try {
+      toast.info("Generating images for slides...");
+      const slidesWithImages = await generateSlideImages();
+      
       const pptx = new pptxgen();
       pptx.title = generatedContent.title;
       pptx.author = "Smart PPT Generator";
+      pptx.layout = "LAYOUT_16x9";
 
       // Title slide
       const titleSlide = pptx.addSlide();
@@ -324,76 +371,193 @@ export default function Create() {
         color: "666666",
       });
 
-      // Content slides (only the finalized ones)
-      generatedContent.slides.forEach((slide) => {
+      // Content slides with images
+      for (const slide of slidesWithImages) {
         const s = pptx.addSlide();
+        
+        // Title
         s.addText(slide.title, {
           x: 0.5,
-          y: 0.5,
+          y: 0.3,
           w: "90%",
-          h: 1,
-          fontSize: 32,
+          h: 0.8,
+          fontSize: 28,
           bold: true,
           color: "1e3a5f",
         });
 
+        // Bullets on left side
         const bulletText = slide.bullets.map((b) => ({
           text: b,
-          options: { bullet: true, fontSize: 18, color: "333333" },
+          options: { bullet: true, fontSize: 16, color: "333333" },
         }));
 
         s.addText(bulletText, {
-          x: 0.75,
-          y: 1.75,
-          w: "85%",
-          h: 4,
+          x: 0.5,
+          y: 1.3,
+          w: slide.imageUrl ? "55%" : "90%",
+          h: 3.8,
           valign: "top",
         });
-      });
 
-      // Generate blob and upload
-      const blob = await pptx.write({ outputType: "blob" });
-      const fileName = `${user.id}/${presentationId}.pptx`;
+        // Add image on right side if available
+        if (slide.imageUrl) {
+          try {
+            s.addImage({
+              data: slide.imageUrl,
+              x: 6.2,
+              y: 1.3,
+              w: 3.3,
+              h: 3.3,
+              rounding: true,
+            });
+          } catch (imgErr) {
+            console.error("Error adding image to slide:", imgErr);
+          }
+        }
+      }
 
-      const { error: uploadError } = await supabase.storage
+      // Generate proper blob
+      const pptxBlob = await pptx.write({ outputType: "blob" }) as Blob;
+      
+      // Create proper download
+      const fileName = `${generatedContent.title.replace(/[^a-z0-9]/gi, "_")}.pptx`;
+      const url = window.URL.createObjectURL(pptxBlob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = fileName;
+      link.style.display = "none";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      // Update database
+      const storagePath = `${user.id}/${presentationId}.pptx`;
+      await supabase.storage
         .from("presentations")
-        .upload(fileName, blob, { 
+        .upload(storagePath, pptxBlob, { 
           contentType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
           upsert: true 
         });
 
-      if (uploadError) throw uploadError;
-
       const { data: urlData } = supabase.storage
         .from("presentations")
-        .getPublicUrl(fileName);
+        .getPublicUrl(storagePath);
 
       await supabase
         .from("presentations")
         .update({
           file_url: urlData.publicUrl,
           status: "completed",
-          slide_count: generatedContent.slides.length + 1, // +1 for title slide
+          slide_count: slidesWithImages.length + 1,
         })
         .eq("id", presentationId);
 
-      // Trigger download
-      const downloadUrl = URL.createObjectURL(blob as Blob);
-      const a = document.createElement("a");
-      a.href = downloadUrl;
-      a.download = `${generatedContent.title.replace(/[^a-z0-9]/gi, "_")}.pptx`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(downloadUrl);
-
       setStep("complete");
-      toast.success("Presentation downloaded!");
-    } catch (error: any) {
+      toast.success("PowerPoint downloaded successfully!");
+    } catch (error: unknown) {
       console.error("Download error:", error);
-      toast.error("Failed to download presentation");
+      const errorMessage = error instanceof Error ? error.message : "Failed to download";
+      toast.error(errorMessage);
     } finally {
       setIsDownloading(false);
+      setDownloadFormat(null);
+    }
+  };
+
+  const handleDownloadPDF = async () => {
+    if (!generatedContent || !user || !presentationId) return;
+
+    setIsDownloading(true);
+    setDownloadFormat("pdf");
+
+    try {
+      toast.info("Generating images for slides...");
+      const slidesWithImages = await generateSlideImages();
+      
+      // Create PDF in landscape (16:9 ratio)
+      const pdf = new jsPDF({
+        orientation: "landscape",
+        unit: "pt",
+        format: [960, 540], // 16:9 aspect ratio
+      });
+
+      // Title slide
+      pdf.setFillColor(255, 255, 255);
+      pdf.rect(0, 0, 960, 540, "F");
+      pdf.setFontSize(36);
+      pdf.setTextColor(30, 58, 95);
+      pdf.text(generatedContent.title, 480, 230, { align: "center" });
+      pdf.setFontSize(16);
+      pdf.setTextColor(100, 100, 100);
+      pdf.text("Generated with Smart PPT", 480, 290, { align: "center" });
+
+      // Content slides
+      for (const slide of slidesWithImages) {
+        pdf.addPage();
+        pdf.setFillColor(255, 255, 255);
+        pdf.rect(0, 0, 960, 540, "F");
+        
+        // Title
+        pdf.setFontSize(24);
+        pdf.setTextColor(30, 58, 95);
+        pdf.text(slide.title, 40, 50);
+        
+        // Draw a line under title
+        pdf.setDrawColor(30, 58, 95);
+        pdf.setLineWidth(1);
+        pdf.line(40, 65, 920, 65);
+        
+        // Bullets
+        pdf.setFontSize(14);
+        pdf.setTextColor(51, 51, 51);
+        const maxWidth = slide.imageUrl ? 500 : 880;
+        let yPos = 100;
+        
+        for (const bullet of slide.bullets) {
+          // Draw bullet point
+          pdf.setFillColor(30, 58, 95);
+          pdf.circle(50, yPos - 4, 3, "F");
+          
+          // Wrap text
+          const lines = pdf.splitTextToSize(bullet, maxWidth);
+          pdf.text(lines, 65, yPos);
+          yPos += lines.length * 20 + 15;
+        }
+        
+        // Add image if available
+        if (slide.imageUrl) {
+          try {
+            pdf.addImage(slide.imageUrl, "PNG", 580, 100, 340, 340);
+          } catch (imgErr) {
+            console.error("Error adding image to PDF:", imgErr);
+          }
+        }
+      }
+
+      // Save PDF
+      const fileName = `${generatedContent.title.replace(/[^a-z0-9]/gi, "_")}.pdf`;
+      pdf.save(fileName);
+
+      // Update database
+      await supabase
+        .from("presentations")
+        .update({
+          status: "completed",
+          slide_count: slidesWithImages.length + 1,
+        })
+        .eq("id", presentationId);
+
+      setStep("complete");
+      toast.success("PDF downloaded successfully!");
+    } catch (error: unknown) {
+      console.error("PDF download error:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to generate PDF";
+      toast.error(errorMessage);
+    } finally {
+      setIsDownloading(false);
+      setDownloadFormat(null);
     }
   };
 
@@ -626,23 +790,6 @@ export default function Create() {
                 >
                   Start Over
                 </Button>
-                <Button
-                  variant="gradient"
-                  onClick={handleDownload}
-                  disabled={isDownloading}
-                >
-                  {isDownloading ? (
-                    <>
-                      <LoadingSpinner size="sm" className="mr-2" />
-                      Preparing...
-                    </>
-                  ) : (
-                    <>
-                      <Download className="h-4 w-4 mr-2" />
-                      Download PPT
-                    </>
-                  )}
-                </Button>
               </div>
             </div>
 
@@ -654,26 +801,47 @@ export default function Create() {
               onDeleteSlide={handleDeleteSlide}
             />
 
-            {/* Bottom Actions */}
-            <div className="flex justify-center pt-4">
-              <Button
-                variant="gradient"
-                size="lg"
-                onClick={handleDownload}
-                disabled={isDownloading}
-              >
-                {isDownloading ? (
-                  <>
-                    <LoadingSpinner size="sm" className="mr-2" />
-                    Preparing Download...
-                  </>
-                ) : (
-                  <>
-                    <Download className="h-4 w-4 mr-2" />
-                    Download Final Presentation
-                  </>
-                )}
-              </Button>
+            {/* Download Options */}
+            <div className="flex flex-col items-center gap-4 pt-6 border-t border-border">
+              <p className="text-sm text-muted-foreground">Choose your download format:</p>
+              <div className="flex items-center gap-4">
+                <Button
+                  variant="gradient"
+                  size="lg"
+                  onClick={handleDownloadPPTX}
+                  disabled={isDownloading || isGeneratingImages}
+                >
+                  {isDownloading && downloadFormat === "pptx" ? (
+                    <>
+                      <LoadingSpinner size="sm" className="mr-2" />
+                      {isGeneratingImages ? "Generating Images..." : "Creating PPTX..."}
+                    </>
+                  ) : (
+                    <>
+                      <Download className="h-4 w-4 mr-2" />
+                      Download PPTX
+                    </>
+                  )}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="lg"
+                  onClick={handleDownloadPDF}
+                  disabled={isDownloading || isGeneratingImages}
+                >
+                  {isDownloading && downloadFormat === "pdf" ? (
+                    <>
+                      <LoadingSpinner size="sm" className="mr-2" />
+                      {isGeneratingImages ? "Generating Images..." : "Creating PDF..."}
+                    </>
+                  ) : (
+                    <>
+                      <FileImage className="h-4 w-4 mr-2" />
+                      Download PDF
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
           </div>
         )}
