@@ -45,14 +45,15 @@ export default function Create() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const initialMode = searchParams.get("mode") === "sample" ? "sample" : "topic";
+  const editPresentationId = searchParams.get("edit");
 
   const [mode, setMode] = useState<"topic" | "sample">(initialMode);
   const [topic, setTopic] = useState("");
   const [slideCount, setSlideCount] = useState([5]);
   const [audienceType, setAudienceType] = useState("student");
-  const [step, setStep] = useState<GenerationStep>("input");
+  const [step, setStep] = useState<GenerationStep>(editPresentationId ? "generating" : "input");
   const [generatedContent, setGeneratedContent] = useState<GeneratedContent | null>(null);
-  const [presentationId, setPresentationId] = useState<string | null>(null);
+  const [presentationId, setPresentationId] = useState<string | null>(editPresentationId);
 
   // Sample mode state
   const [sampleFile, setSampleFile] = useState<File | null>(null);
@@ -65,6 +66,71 @@ export default function Create() {
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadFormat, setDownloadFormat] = useState<"pptx" | "pdf" | null>(null);
   const [isGeneratingImages, setIsGeneratingImages] = useState(false);
+  const [loadingPresentation, setLoadingPresentation] = useState(!!editPresentationId);
+
+  // Load existing presentation for editing
+  useEffect(() => {
+    if (editPresentationId && user) {
+      loadExistingPresentation(editPresentationId);
+    }
+  }, [editPresentationId, user]);
+
+  const loadExistingPresentation = async (id: string) => {
+    setLoadingPresentation(true);
+    try {
+      const { data: pres, error } = await supabase
+        .from("presentations")
+        .select("*")
+        .eq("id", id)
+        .maybeSingle();
+
+      if (error) throw error;
+      
+      if (!pres) {
+        toast.error("Presentation not found");
+        navigate("/dashboard");
+        return;
+      }
+
+      setTopic(pres.topic);
+      setAudienceType(pres.audience_type || "student");
+      setPresentationId(pres.id);
+
+      // Try to regenerate content based on stored info
+      // For now, we'll create placeholder content from the presentation record
+      const placeholderContent: GeneratedContent = {
+        title: pres.title,
+        slides: Array.from({ length: pres.slide_count - 1 }, (_, i) => ({
+          title: `Slide ${i + 1}`,
+          bullets: ["Content will be regenerated on edit"],
+        })),
+      };
+
+      // Try to invoke edge function to get actual content
+      const { data, error: fnError } = await supabase.functions.invoke("generate-ppt-content", {
+        body: {
+          topic: pres.topic,
+          slideCount: pres.slide_count - 1,
+          audienceType: pres.audience_type || "student",
+          mode: pres.mode,
+        },
+      });
+
+      if (!fnError && data?.content) {
+        setGeneratedContent(data.content);
+      } else {
+        setGeneratedContent(placeholderContent);
+      }
+
+      setStep("overview");
+    } catch (error) {
+      console.error("Error loading presentation:", error);
+      toast.error("Failed to load presentation");
+      navigate("/dashboard");
+    } finally {
+      setLoadingPresentation(false);
+    }
+  };
 
   useEffect(() => {
     if (!loading && !user) {
@@ -454,7 +520,8 @@ export default function Create() {
         })
         .eq("id", presentationId);
 
-      setStep("complete");
+      // Update slides with images for display
+      setGeneratedContent({ ...generatedContent, slides: slidesWithImages });
       toast.success("PowerPoint downloaded successfully!");
     } catch (error: unknown) {
       console.error("Download error:", error);
@@ -549,7 +616,8 @@ export default function Create() {
         })
         .eq("id", presentationId);
 
-      setStep("complete");
+      // Update slides with images for display
+      setGeneratedContent({ ...generatedContent, slides: slidesWithImages });
       toast.success("PDF downloaded successfully!");
     } catch (error: unknown) {
       console.error("PDF download error:", error);
@@ -561,7 +629,7 @@ export default function Create() {
     }
   };
 
-  if (loading) {
+  if (loading || loadingPresentation) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <LoadingSpinner size="lg" />

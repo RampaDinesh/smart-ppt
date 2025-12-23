@@ -1,11 +1,12 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Pencil, Trash2, GripVertical } from "lucide-react";
+import { Pencil, Trash2, GripVertical, ImageIcon } from "lucide-react";
 
 interface SlideContent {
   title: string;
   bullets: string[];
+  imageUrl?: string;
 }
 
 interface SlideOverviewProps {
@@ -80,18 +81,44 @@ export function SlideOverview({
             </div>
           </CardHeader>
           <CardContent>
-            <CardTitle className="text-lg mb-3">{slide.title}</CardTitle>
-            <ul className="space-y-2">
-              {slide.bullets.map((bullet, bulletIndex) => (
-                <li
-                  key={bulletIndex}
-                  className="flex items-start gap-2 text-sm text-muted-foreground"
-                >
-                  <span className="w-1.5 h-1.5 rounded-full bg-primary mt-1.5 flex-shrink-0" />
-                  <span>{bullet}</span>
-                </li>
-              ))}
-            </ul>
+            <div className="flex gap-4">
+              {/* Text Content */}
+              <div className={slide.imageUrl ? "flex-1" : "w-full"}>
+                <CardTitle className="text-lg mb-3">{slide.title}</CardTitle>
+                <ul className="space-y-2">
+                  {slide.bullets.map((bullet, bulletIndex) => (
+                    <li
+                      key={bulletIndex}
+                      className="flex items-start gap-2 text-sm text-muted-foreground"
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-primary mt-1.5 flex-shrink-0" />
+                      <span>{bullet}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              
+              {/* Image Preview */}
+              {slide.imageUrl && (
+                <div className="w-32 h-32 flex-shrink-0 rounded-lg overflow-hidden border border-border bg-muted">
+                  <img 
+                    src={slide.imageUrl} 
+                    alt={`Slide ${index + 1} image`}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              )}
+              
+              {/* Image Placeholder */}
+              {!slide.imageUrl && (
+                <div className="w-32 h-32 flex-shrink-0 rounded-lg border border-dashed border-border bg-muted/50 flex items-center justify-center">
+                  <div className="text-center text-muted-foreground">
+                    <ImageIcon className="h-6 w-6 mx-auto mb-1 opacity-50" />
+                    <span className="text-xs">Auto-generated<br/>on download</span>
+                  </div>
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
       ))}
