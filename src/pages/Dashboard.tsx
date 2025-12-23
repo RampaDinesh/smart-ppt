@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Footer } from "@/components/Footer";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -155,6 +156,7 @@ export default function Dashboard() {
                 Admin
               </Button>
             )}
+            <ThemeToggle />
             <Button variant="ghost" size="icon" onClick={handleSignOut}>
               <LogOut className="h-4 w-4" />
             </Button>
