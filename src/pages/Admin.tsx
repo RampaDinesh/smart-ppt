@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { Footer } from "@/components/Footer";
 import { toast } from "sonner";
 import {
   Presentation,
@@ -111,7 +112,7 @@ export default function Admin() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
       <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 h-16 flex items-center gap-4">
@@ -127,7 +128,7 @@ export default function Admin() {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8">
+      <main className="container mx-auto px-4 py-8 flex-1">
         <div className="mb-8">
           <h1 className="font-display text-3xl font-bold mb-2">Admin Overview</h1>
           <p className="text-muted-foreground">Monitor platform usage and statistics</p>
@@ -213,6 +214,8 @@ export default function Admin() {
           </CardContent>
         </Card>
       </main>
+
+      <Footer />
     </div>
   );
 }

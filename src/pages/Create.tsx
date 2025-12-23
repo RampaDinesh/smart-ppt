@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { Footer } from "@/components/Footer";
 import {
   Presentation,
   ArrowLeft,
@@ -98,7 +99,15 @@ export default function Create() {
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Edge function error:", error);
+        throw new Error(error.message || "Failed to generate content");
+      }
+
+      if (!data || !data.content) {
+        console.error("Invalid response data:", data);
+        throw new Error("No content received from AI");
+      }
 
       setGeneratedContent(data.content);
 
@@ -109,7 +118,8 @@ export default function Create() {
       toast.success("Presentation generated successfully!");
     } catch (error: any) {
       console.error("Generation error:", error);
-      toast.error(error.message || "Failed to generate presentation");
+      const errorMessage = error?.message || "Failed to generate presentation. Please try again.";
+      toast.error(errorMessage);
       setStep("input");
 
       // Update status to failed
@@ -199,7 +209,15 @@ export default function Create() {
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Edge function error:", error);
+        throw new Error(error.message || "Failed to generate content");
+      }
+
+      if (!data || !data.content) {
+        console.error("Invalid response data:", data);
+        throw new Error("No content received from AI");
+      }
 
       setGeneratedContent(data.content);
       await generatePPTFile(data.content, presData.id);
@@ -208,8 +226,17 @@ export default function Create() {
       toast.success("Presentation generated successfully!");
     } catch (error: any) {
       console.error("Generation error:", error);
-      toast.error(error.message || "Failed to generate presentation");
+      const errorMessage = error?.message || "Failed to generate presentation. Please try again.";
+      toast.error(errorMessage);
       setStep("input");
+
+      // Update status to failed
+      if (presentationId) {
+        await supabase
+          .from("presentations")
+          .update({ status: "failed" })
+          .eq("id", presentationId);
+      }
     }
   };
 
@@ -309,7 +336,7 @@ export default function Create() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
       <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 h-16 flex items-center gap-4">
@@ -325,7 +352,7 @@ export default function Create() {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8 max-w-3xl">
+      <main className="container mx-auto px-4 py-8 max-w-3xl flex-1">
         {step === "input" && (
           <Tabs value={mode} onValueChange={(v) => setMode(v as "topic" | "sample")}>
             <TabsList className="grid w-full grid-cols-2 mb-8">
@@ -539,6 +566,8 @@ export default function Create() {
           </Card>
         )}
       </main>
+
+      <Footer />
     </div>
   );
 }

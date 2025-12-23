@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { Footer } from "@/components/Footer";
 import { toast } from "sonner";
 import {
   Presentation,
@@ -35,7 +36,7 @@ interface PresentationRecord {
 }
 
 export default function Dashboard() {
-  const { user, loading, signOut, isAdmin } = useAuth();
+  const { user, loading, signOut, isAdmin, displayName } = useAuth();
   const navigate = useNavigate();
   const [presentations, setPresentations] = useState<PresentationRecord[]>([]);
   const [loadingPresentations, setLoadingPresentations] = useState(true);
@@ -96,7 +97,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
       <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
@@ -120,11 +121,11 @@ export default function Dashboard() {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8">
+      <main className="container mx-auto px-4 py-8 flex-1">
         {/* Welcome Section */}
         <div className="mb-8">
           <h1 className="font-display text-3xl font-bold mb-2">
-            Welcome back{user?.email ? `, ${user.email.split("@")[0]}` : ""}!
+            Welcome back, {displayName}!
           </h1>
           <p className="text-muted-foreground">Create and manage your presentations</p>
         </div>
@@ -261,6 +262,8 @@ export default function Dashboard() {
           )}
         </div>
       </main>
+
+      <Footer />
     </div>
   );
 }
