@@ -1,7 +1,9 @@
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Pencil, Trash2, GripVertical, ImageIcon } from "lucide-react";
+import { Pencil, Trash2, GripVertical, RefreshCw } from "lucide-react";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
 
 interface SlideContent {
   title: string;
@@ -14,6 +16,8 @@ interface SlideOverviewProps {
   presentationTitle: string;
   onEditSlide: (index: number) => void;
   onDeleteSlide: (index: number) => void;
+  onRegenerateImage?: (index: number) => Promise<void>;
+  regeneratingImageIndex?: number | null;
 }
 
 export function SlideOverview({
@@ -21,6 +25,8 @@ export function SlideOverview({
   presentationTitle,
   onEditSlide,
   onDeleteSlide,
+  onRegenerateImage,
+  regeneratingImageIndex,
 }: SlideOverviewProps) {
   return (
     <div className="space-y-6">
@@ -83,7 +89,7 @@ export function SlideOverview({
           <CardContent>
             <div className="flex gap-4">
               {/* Text Content */}
-              <div className={slide.imageUrl ? "flex-1" : "w-full"}>
+              <div className="flex-1">
                 <CardTitle className="text-lg mb-3">{slide.title}</CardTitle>
                 <ul className="space-y-2">
                   {slide.bullets.map((bullet, bulletIndex) => (
@@ -98,26 +104,53 @@ export function SlideOverview({
                 </ul>
               </div>
               
-              {/* Image Preview */}
-              {slide.imageUrl && (
-                <div className="w-32 h-32 flex-shrink-0 rounded-lg overflow-hidden border border-border bg-muted">
-                  <img 
-                    src={slide.imageUrl} 
-                    alt={`Slide ${index + 1} image`}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-              )}
-              
-              {/* Image Placeholder */}
-              {!slide.imageUrl && (
-                <div className="w-32 h-32 flex-shrink-0 rounded-lg border border-dashed border-border bg-muted/50 flex items-center justify-center">
-                  <div className="text-center text-muted-foreground">
-                    <ImageIcon className="h-6 w-6 mx-auto mb-1 opacity-50" />
-                    <span className="text-xs">Auto-generated<br/>on download</span>
+              {/* Image Section */}
+              <div className="w-40 h-32 flex-shrink-0 relative group/image">
+                {regeneratingImageIndex === index ? (
+                  <div className="w-full h-full rounded-lg border border-border bg-muted flex items-center justify-center">
+                    <LoadingSpinner size="sm" />
                   </div>
-                </div>
-              )}
+                ) : slide.imageUrl ? (
+                  <>
+                    <img 
+                      src={slide.imageUrl} 
+                      alt={`Slide ${index + 1}`}
+                      className="w-full h-full object-cover rounded-lg border border-border"
+                    />
+                    {onRegenerateImage && (
+                      <Button
+                        size="icon"
+                        variant="secondary"
+                        className="absolute bottom-2 right-2 h-7 w-7 opacity-0 group-hover/image:opacity-100 transition-opacity shadow-md"
+                        onClick={() => onRegenerateImage(index)}
+                        title="Replace image"
+                      >
+                        <RefreshCw className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                  </>
+                ) : (
+                  <div 
+                    className="w-full h-full rounded-lg border border-border bg-muted/50 flex items-center justify-center cursor-pointer hover:bg-muted transition-colors"
+                    onClick={() => onRegenerateImage?.(index)}
+                  >
+                    {onRegenerateImage && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="gap-1"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onRegenerateImage(index);
+                        }}
+                      >
+                        <RefreshCw className="h-3.5 w-3.5" />
+                        Generate
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>

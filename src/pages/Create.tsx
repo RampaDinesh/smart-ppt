@@ -67,6 +67,7 @@ export default function Create() {
   const [downloadFormat, setDownloadFormat] = useState<"pptx" | "pdf" | null>(null);
   const [isGeneratingImages, setIsGeneratingImages] = useState(false);
   const [loadingPresentation, setLoadingPresentation] = useState(!!editPresentationId);
+  const [regeneratingImageIndex, setRegeneratingImageIndex] = useState<number | null>(null);
 
   // Load existing presentation for editing
   useEffect(() => {
@@ -359,6 +360,37 @@ export default function Create() {
       toast.error(error?.message || "Failed to regenerate slide");
     } finally {
       setIsRegenerating(false);
+    }
+  };
+
+  const handleRegenerateImage = async (index: number) => {
+    if (!generatedContent) return;
+
+    setRegeneratingImageIndex(index);
+    const slide = generatedContent.slides[index];
+
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-slide-image", {
+        body: {
+          slideTitle: slide.title,
+          slideBullets: slide.bullets,
+          presentationTopic: topic,
+        },
+      });
+
+      if (error || !data?.success) {
+        throw new Error("Failed to generate image");
+      }
+
+      const newSlides = [...generatedContent.slides];
+      newSlides[index] = { ...slide, imageUrl: data.imageUrl };
+      setGeneratedContent({ ...generatedContent, slides: newSlides });
+      toast.success("Image updated!");
+    } catch (error) {
+      console.error("Error regenerating image:", error);
+      toast.error("Failed to generate image");
+    } finally {
+      setRegeneratingImageIndex(null);
     }
   };
 
@@ -867,6 +899,8 @@ export default function Create() {
               presentationTitle={generatedContent.title}
               onEditSlide={handleEditSlide}
               onDeleteSlide={handleDeleteSlide}
+              onRegenerateImage={handleRegenerateImage}
+              regeneratingImageIndex={regeneratingImageIndex}
             />
 
             {/* Download Options */}
