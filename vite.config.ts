@@ -5,7 +5,8 @@ import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
-  base: "/smart-ppt/",
+  // Use /smart-ppt/ for GitHub Pages, "/" for Vercel/other deployments
+  base: process.env.GITHUB_PAGES === "true" ? "/smart-ppt/" : "/",
   server: {
     host: "::",
     port: 8080,
@@ -14,6 +15,17 @@ export default defineConfig(({ mode }) => ({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+    },
+  },
+  build: {
+    outDir: "dist",
+    sourcemap: false,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ["react", "react-dom", "react-router-dom"],
+        },
+      },
     },
   },
 }));
