@@ -1,1 +1,4 @@
 project_id = "bvrpeeoeuzolseowjhoj"
+
+[functions.generate-ppt-content]
+verify_jwt = false
