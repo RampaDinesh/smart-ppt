@@ -131,22 +131,12 @@ export function SlideOverview({
                   </>
                 ) : (
                   <div 
-                    className="w-full h-full rounded-lg border border-border bg-muted/50 flex items-center justify-center cursor-pointer hover:bg-muted transition-colors"
+                    className="w-full h-full rounded-lg border border-border bg-muted/30 flex items-center justify-center cursor-pointer hover:bg-muted/50 transition-colors group/placeholder"
                     onClick={() => onRegenerateImage?.(index)}
+                    title="Click to generate image"
                   >
                     {onRegenerateImage && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="gap-1"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onRegenerateImage(index);
-                        }}
-                      >
-                        <RefreshCw className="h-3.5 w-3.5" />
-                        Generate
-                      </Button>
+                      <RefreshCw className="h-5 w-5 text-muted-foreground/50 group-hover/placeholder:text-muted-foreground transition-colors" />
                     )}
                   </div>
                 )}

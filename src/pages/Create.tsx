@@ -15,6 +15,13 @@ import { Footer } from "@/components/Footer";
 import { SlideOverview } from "@/components/SlideOverview";
 import { SlideEditDialog } from "@/components/SlideEditDialog";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Presentation,
   ArrowLeft,
   Sparkles,
@@ -68,6 +75,7 @@ export default function Create() {
   const [isGeneratingImages, setIsGeneratingImages] = useState(false);
   const [loadingPresentation, setLoadingPresentation] = useState(!!editPresentationId);
   const [regeneratingImageIndex, setRegeneratingImageIndex] = useState<number | null>(null);
+  const [showDownloadModal, setShowDownloadModal] = useState(false);
 
   // Load existing presentation for editing
   useEffect(() => {
@@ -211,8 +219,11 @@ export default function Create() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.name.endsWith(".pptx")) {
-      toast.error("Please upload a .pptx file");
+    const isPptx = file.name.endsWith(".pptx");
+    const isPdf = file.name.endsWith(".pdf");
+    
+    if (!isPptx && !isPdf) {
+      toast.error("Please upload a .pptx or .pdf file");
       return;
     }
 
@@ -228,6 +239,7 @@ export default function Create() {
         averageBulletLength: 12,
         hasImages: false,
         structure: "title-content-conclusion",
+        fileType: isPdf ? "pdf" : "pptx",
       };
 
       setSampleAnalysis(mockAnalysis);
@@ -795,7 +807,7 @@ export default function Create() {
                             Change file
                             <input
                               type="file"
-                              accept=".pptx"
+                              accept=".pptx,.pdf"
                               className="hidden"
                               onChange={handleSampleUpload}
                             />
@@ -811,12 +823,12 @@ export default function Create() {
                             <span className="text-muted-foreground"> or drag and drop</span>
                             <input
                               type="file"
-                              accept=".pptx"
+                              accept=".pptx,.pdf"
                               className="hidden"
                               onChange={handleSampleUpload}
                             />
                           </label>
-                          <p className="text-sm text-muted-foreground mt-1">.pptx files only</p>
+                          <p className="text-sm text-muted-foreground mt-1">.pptx or .pdf files</p>
                         </>
                       )}
                     </div>
@@ -903,48 +915,73 @@ export default function Create() {
               regeneratingImageIndex={regeneratingImageIndex}
             />
 
-            {/* Download Options */}
-            <div className="flex flex-col items-center gap-4 pt-6 border-t border-border">
-              <p className="text-sm text-muted-foreground">Choose your download format:</p>
-              <div className="flex items-center gap-4">
-                <Button
-                  variant="gradient"
-                  size="lg"
-                  onClick={handleDownloadPPTX}
-                  disabled={isDownloading || isGeneratingImages}
-                >
-                  {isDownloading && downloadFormat === "pptx" ? (
-                    <>
-                      <LoadingSpinner size="sm" className="mr-2" />
-                      {isGeneratingImages ? "Generating Images..." : "Creating PPTX..."}
-                    </>
-                  ) : (
-                    <>
-                      <Download className="h-4 w-4 mr-2" />
-                      Download PPTX
-                    </>
-                  )}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="lg"
-                  onClick={handleDownloadPDF}
-                  disabled={isDownloading || isGeneratingImages}
-                >
-                  {isDownloading && downloadFormat === "pdf" ? (
-                    <>
-                      <LoadingSpinner size="sm" className="mr-2" />
-                      {isGeneratingImages ? "Generating Images..." : "Creating PDF..."}
-                    </>
-                  ) : (
-                    <>
-                      <FileImage className="h-4 w-4 mr-2" />
-                      Download PDF
-                    </>
-                  )}
-                </Button>
-              </div>
+            {/* Download Button */}
+            <div className="flex justify-center pt-6 border-t border-border">
+              <Button
+                variant="gradient"
+                size="lg"
+                onClick={() => setShowDownloadModal(true)}
+                disabled={isDownloading || isGeneratingImages}
+              >
+                {isDownloading ? (
+                  <>
+                    <LoadingSpinner size="sm" className="mr-2" />
+                    {isGeneratingImages ? "Generating Images..." : `Creating ${downloadFormat?.toUpperCase()}...`}
+                  </>
+                ) : (
+                  <>
+                    <Download className="h-4 w-4 mr-2" />
+                    Download Presentation
+                  </>
+                )}
+              </Button>
             </div>
+
+            {/* Download Format Modal */}
+            <Dialog open={showDownloadModal} onOpenChange={setShowDownloadModal}>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Choose Download Format</DialogTitle>
+                  <DialogDescription>
+                    Select your preferred format for the presentation download.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="flex flex-col gap-3 pt-4">
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    className="justify-start gap-3 h-14"
+                    onClick={() => {
+                      setShowDownloadModal(false);
+                      handleDownloadPPTX();
+                    }}
+                    disabled={isDownloading}
+                  >
+                    <Download className="h-5 w-5" />
+                    <div className="text-left">
+                      <div className="font-medium">PowerPoint (PPTX)</div>
+                      <div className="text-xs text-muted-foreground">Editable presentation file</div>
+                    </div>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    className="justify-start gap-3 h-14"
+                    onClick={() => {
+                      setShowDownloadModal(false);
+                      handleDownloadPDF();
+                    }}
+                    disabled={isDownloading}
+                  >
+                    <FileImage className="h-5 w-5" />
+                    <div className="text-left">
+                      <div className="font-medium">PDF Document</div>
+                      <div className="text-xs text-muted-foreground">Static, ready to share</div>
+                    </div>
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
         )}
 
