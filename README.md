@@ -1,4 +1,4 @@
-#Smart PPT Generator
+# Smart PPT Generator
 
 Smart PPT Generator is a full-stack web application that helps students create structured, exam-friendly presentations quickly. The app supports topic-based generation as well as sample-based style matching, with preview and export options.
 ##🚀 Features
