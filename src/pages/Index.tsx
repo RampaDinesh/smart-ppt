@@ -2,52 +2,27 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { Footer } from "@/components/Footer";
-import { 
-  Presentation, 
-  Sparkles, 
-  Upload, 
-  Download, 
-  Users, 
-  Zap,
-  ArrowRight,
-  Check,
-  Linkedin,
-  Github
-} from "lucide-react";
-
+import { Presentation, Sparkles, Upload, Download, Users, Zap, ArrowRight, Check, Linkedin, Github } from "lucide-react";
 export default function Index() {
   const navigate = useNavigate();
-  const { user } = useAuth();
-
-  const features = [
-    {
-      icon: Sparkles,
-      title: "Topic Mode",
-      description: "Enter any topic and let AI create exam-friendly presentations with structured content.",
-    },
-    {
-      icon: Upload,
-      title: "Sample Mode",
-      description: "Upload a sample PPT and we'll match its structure and style for your new topic.",
-    },
-    {
-      icon: Download,
-      title: "Instant Download",
-      description: "Get your polished .pptx files ready to use within seconds.",
-    },
-  ];
-
-  const benefits = [
-    "AI-powered content generation",
-    "Exam-friendly bullet points",
-    "Multiple audience types",
-    "Structure matching from samples",
-    "Secure file handling",
-    "History & download tracking",
-  ];
-
-  return (
-    <div className="min-h-screen gradient-hero flex flex-col">
+  const {
+    user
+  } = useAuth();
+  const features = [{
+    icon: Sparkles,
+    title: "Topic Mode",
+    description: "Enter any topic and let AI create exam-friendly presentations with structured content."
+  }, {
+    icon: Upload,
+    title: "Sample Mode",
+    description: "Upload a sample PPT and we'll match its structure and style for your new topic."
+  }, {
+    icon: Download,
+    title: "Instant Download",
+    description: "Get your polished .pptx files ready to use within seconds."
+  }];
+  const benefits = ["AI-powered content generation", "Exam-friendly bullet points", "Multiple audience types", "Structure matching from samples", "Secure file handling", "History & download tracking"];
+  return <div className="min-h-screen gradient-hero flex flex-col">
       {/* Navigation */}
       <nav className="container mx-auto px-4 py-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -57,13 +32,10 @@ export default function Index() {
           <span className="font-display font-bold text-xl">Smart PPT</span>
         </div>
         <div className="flex items-center gap-4">
-          {user ? (
-            <Button onClick={() => navigate("/dashboard")} variant="gradient">
+          {user ? <Button onClick={() => navigate("/dashboard")} variant="gradient">
               Go to Dashboard
               <ArrowRight className="h-4 w-4" />
-            </Button>
-          ) : (
-            <>
+            </Button> : <>
               <Button variant="ghost" onClick={() => navigate("/auth")}>
                 Sign In
               </Button>
@@ -71,8 +43,7 @@ export default function Index() {
                 Get Started
                 <ArrowRight className="h-4 w-4" />
               </Button>
-            </>
-          )}
+            </>}
         </div>
       </nav>
 
@@ -90,42 +61,44 @@ export default function Index() {
             in Seconds
           </h1>
           
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-10 animate-slide-up" style={{ animationDelay: "0.1s" }}>
+          <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-10 animate-slide-up" style={{
+          animationDelay: "0.1s"
+        }}>
             Generate exam-friendly PowerPoint presentations from any topic, or match the style of your existing slides. Perfect for students and teachers.
           </p>
           
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-slide-up" style={{ animationDelay: "0.2s" }}>
-            <Button 
-              size="xl" 
-              variant="hero" 
-              onClick={() => navigate(user ? "/dashboard" : "/auth")}
-              className="min-w-[200px]"
-            >
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-slide-up" style={{
+          animationDelay: "0.2s"
+        }}>
+            <Button size="xl" variant="hero" onClick={() => navigate(user ? "/dashboard" : "/auth")} className="min-w-[200px]">
               {user ? "Open Dashboard" : "Start Creating Free"}
               <ArrowRight className="h-5 w-5" />
             </Button>
-            <Button 
-              size="xl" 
-              variant="outline" 
-              onClick={() => document.getElementById("features")?.scrollIntoView({ behavior: "smooth" })}
-            >
+            <Button size="xl" variant="outline" onClick={() => document.getElementById("features")?.scrollIntoView({
+            behavior: "smooth"
+          })}>
               See How It Works
             </Button>
           </div>
         </div>
 
         {/* Stats */}
-        <div className="max-w-3xl mx-auto mt-20 grid grid-cols-3 gap-8 text-center animate-fade-in" style={{ animationDelay: "0.3s" }}>
-          {[
-            { value: "2", label: "Generation Modes" },
-            { value: "4", label: "Audience Types" },
-            { value: "∞", label: "Possibilities" },
-          ].map((stat) => (
-            <div key={stat.label} className="space-y-1">
+        <div className="max-w-3xl mx-auto mt-20 grid grid-cols-3 gap-8 text-center animate-fade-in" style={{
+        animationDelay: "0.3s"
+      }}>
+          {[{
+          value: "2",
+          label: "Generation Modes"
+        }, {
+          value: "4",
+          label: "Audience Types"
+        }, {
+          value: "∞",
+          label: "Possibilities"
+        }].map(stat => <div key={stat.label} className="space-y-1">
               <div className="text-4xl font-display font-bold gradient-text">{stat.value}</div>
               <div className="text-sm text-muted-foreground">{stat.label}</div>
-            </div>
-          ))}
+            </div>)}
         </div>
       </section>
 
@@ -142,19 +115,15 @@ export default function Index() {
           </div>
 
           <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            {features.map((feature, index) => (
-              <div
-                key={feature.title}
-                className="group p-8 rounded-2xl bg-card shadow-soft hover:shadow-medium transition-all duration-300 hover:-translate-y-1 animate-slide-up"
-                style={{ animationDelay: `${index * 0.1}s` }}
-              >
+            {features.map((feature, index) => <div key={feature.title} className="group p-8 rounded-2xl bg-card shadow-soft hover:shadow-medium transition-all duration-300 hover:-translate-y-1 animate-slide-up" style={{
+            animationDelay: `${index * 0.1}s`
+          }}>
                 <div className="w-14 h-14 gradient-bg rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                   <feature.icon className="h-7 w-7 text-primary-foreground" />
                 </div>
                 <h3 className="font-display text-xl font-semibold mb-3">{feature.title}</h3>
                 <p className="text-muted-foreground">{feature.description}</p>
-              </div>
-            ))}
+              </div>)}
           </div>
         </div>
       </section>
@@ -172,14 +141,12 @@ export default function Index() {
                 Our AI understands educational content and creates presentations that are exam-focused, well-structured, and easy to understand.
               </p>
               <ul className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {benefits.map((benefit) => (
-                  <li key={benefit} className="flex items-center gap-3">
+                {benefits.map(benefit => <li key={benefit} className="flex items-center gap-3">
                     <div className="w-5 h-5 rounded-full gradient-bg flex items-center justify-center flex-shrink-0">
                       <Check className="h-3 w-3 text-primary-foreground" />
                     </div>
                     <span className="text-sm">{benefit}</span>
-                  </li>
-                ))}
+                  </li>)}
               </ul>
             </div>
             <div className="relative">
@@ -227,12 +194,7 @@ export default function Index() {
           <p className="text-primary-foreground/80 max-w-xl mx-auto mb-10">
             Join thousands of students and teachers who save hours creating professional presentations.
           </p>
-          <Button 
-            size="xl" 
-            variant="secondary"
-            onClick={() => navigate(user ? "/dashboard" : "/auth")}
-            className="min-w-[200px]"
-          >
+          <Button size="xl" variant="secondary" onClick={() => navigate(user ? "/dashboard" : "/auth")} className="min-w-[200px]">
             {user ? "Go to Dashboard" : "Get Started Free"}
             <ArrowRight className="h-5 w-5" />
           </Button>
@@ -246,32 +208,11 @@ export default function Index() {
           <p className="text-muted-foreground max-w-2xl mx-auto mb-6">
             Smart PPT Generator is designed to help students and educators create professional presentations effortlessly using AI technology.
           </p>
-          <div className="flex items-center justify-center gap-3">
-            <span className="text-muted-foreground">Developed by Dinesh</span>
-            <a
-              href="https://www.linkedin.com/in/dinesh-rampa-483963284"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
-              aria-label="LinkedIn Profile"
-            >
-              <Linkedin className="h-4 w-4" />
-            </a>
-            <a
-              href="https://github.com/RampaDinesh"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
-              aria-label="GitHub Profile"
-            >
-              <Github className="h-4 w-4" />
-            </a>
-          </div>
+          
         </div>
       </section>
 
       {/* Footer */}
       <Footer />
-    </div>
-  );
+    </div>;
 }
