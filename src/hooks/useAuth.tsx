@@ -2,11 +2,18 @@ import { createContext, useContext, useEffect, useState, ReactNode } from "react
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 
+interface UserProfile {
+  full_name: string | null;
+  avatar_url: string | null;
+}
+
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
   isAdmin: boolean;
+  profile: UserProfile | null;
+  displayName: string;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -19,6 +26,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+
+  // Compute display name from profile or fallback to email
+  const displayName = profile?.full_name || user?.user_metadata?.full_name || user?.email?.split("@")[0] || "User";
 
   useEffect(() => {
     // Set up auth state listener FIRST
@@ -27,13 +38,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSession(session);
         setUser(session?.user ?? null);
         
-        // Defer admin check
+        // Defer admin check and profile fetch
         if (session?.user) {
           setTimeout(() => {
             checkAdminStatus(session.user.id);
+            fetchProfile(session.user.id);
           }, 0);
         } else {
           setIsAdmin(false);
+          setProfile(null);
         }
         setLoading(false);
       }
@@ -45,12 +58,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(session?.user ?? null);
       if (session?.user) {
         checkAdminStatus(session.user.id);
+        fetchProfile(session.user.id);
       }
       setLoading(false);
     });
 
     return () => subscription.unsubscribe();
   }, []);
+
+  const fetchProfile = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("full_name, avatar_url")
+        .eq("user_id", userId)
+        .maybeSingle();
+
+      if (!error && data) {
+        setProfile(data);
+      }
+    } catch {
+      // Ignore errors
+    }
+  };
 
   const checkAdminStatus = async (userId: string) => {
     try {
@@ -100,6 +130,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     await supabase.auth.signOut();
     setIsAdmin(false);
+    setProfile(null);
   };
 
   return (
@@ -109,6 +140,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         session,
         loading,
         isAdmin,
+        profile,
+        displayName,
         signUp,
         signIn,
         signOut,

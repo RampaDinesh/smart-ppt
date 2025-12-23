@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
+import { Footer } from "@/components/Footer";
 import { 
   Presentation, 
   Sparkles, 
@@ -44,7 +45,7 @@ export default function Index() {
   ];
 
   return (
-    <div className="min-h-screen gradient-hero">
+    <div className="min-h-screen gradient-hero flex flex-col">
       {/* Navigation */}
       <nav className="container mx-auto px-4 py-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -237,11 +238,7 @@ export default function Index() {
       </section>
 
       {/* Footer */}
-      <footer className="py-8 border-t border-border">
-        <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
-          <p>© {new Date().getFullYear()} Smart PPT Generator. Create presentations with AI.</p>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 }
