@@ -10,7 +10,9 @@ import {
   Users, 
   Zap,
   ArrowRight,
-  Check
+  Check,
+  Linkedin,
+  Github
 } from "lucide-react";
 
 export default function Index() {
@@ -234,6 +236,37 @@ export default function Index() {
             {user ? "Go to Dashboard" : "Get Started Free"}
             <ArrowRight className="h-5 w-5" />
           </Button>
+        </div>
+      </section>
+
+      {/* About Section */}
+      <section id="about" className="py-16 bg-card/50">
+        <div className="container mx-auto px-4 text-center">
+          <h2 className="font-display text-2xl font-bold mb-4">About</h2>
+          <p className="text-muted-foreground max-w-2xl mx-auto mb-6">
+            Smart PPT Generator is designed to help students and educators create professional presentations effortlessly using AI technology.
+          </p>
+          <div className="flex items-center justify-center gap-3">
+            <span className="text-muted-foreground">Developed by Dinesh</span>
+            <a
+              href="https://www.linkedin.com/in/dinesh-rampa-483963284"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+              aria-label="LinkedIn Profile"
+            >
+              <Linkedin className="h-4 w-4" />
+            </a>
+            <a
+              href="https://github.com/RampaDinesh"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+              aria-label="GitHub Profile"
+            >
+              <Github className="h-4 w-4" />
+            </a>
+          </div>
         </div>
       </section>
 
