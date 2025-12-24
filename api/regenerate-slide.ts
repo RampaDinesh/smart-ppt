@@ -1,11 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'Content-Type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
-
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -20,7 +14,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { topic, slideCount, audienceType, mode, sampleAnalysis } = req.body;
+    const { currentSlide, editPrompt, presentationTopic, audienceType } = req.body;
 
     const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
     if (!GEMINI_API_KEY) {
@@ -34,33 +28,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       general: "Keep content accessible and engaging for a broad audience.",
     };
 
-    let systemPrompt = `You are an expert presentation creator. Generate a structured PowerPoint presentation.
-    
+    const systemPrompt = `You are an expert presentation creator. You need to regenerate a single slide based on user feedback.
+
 Rules:
-- Each slide should have a clear title and 3-5 bullet points
+- Keep the slide title relevant to the content
+- Generate 3-5 bullet points
 - Keep bullet points concise (under 15 words each)
-- Focus on key information that's easy to remember
-- Structure: Title slide info, then content slides, ending with a conclusion
-- ${audienceInstructions[audienceType] || audienceInstructions.general}`;
+- ${audienceInstructions[audienceType] || audienceInstructions.general}
+- Apply the user's requested changes while keeping the content relevant to the overall topic`;
 
-    if (mode === 'sample' && sampleAnalysis) {
-      systemPrompt += `\n\nMatch this structure from the sample:
-- ${sampleAnalysis.slideCount} slides
-- ${sampleAnalysis.averageBulletsPerSlide} bullets per slide
-- Bullet length around ${sampleAnalysis.averageBulletLength} words`;
-    }
+    const userPrompt = `The presentation is about: "${presentationTopic}"
 
-    const userPrompt = `Create a ${slideCount}-slide presentation about: "${topic}"
+Current slide content:
+Title: ${currentSlide.title}
+Bullets:
+${currentSlide.bullets.map((b: string, i: number) => `${i + 1}. ${b}`).join('\n')}
+
+User's requested changes: "${editPrompt}"
 
 Return ONLY valid JSON in this exact format:
 {
-  "title": "Presentation Title",
-  "slides": [
-    {"title": "Slide Title", "bullets": ["Point 1", "Point 2", "Point 3"]}
-  ]
+  "title": "New Slide Title",
+  "bullets": ["Point 1", "Point 2", "Point 3", "Point 4"]
 }`;
 
-    // Call Gemini API directly
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
       {
@@ -78,7 +69,7 @@ Return ONLY valid JSON in this exact format:
           ],
           generationConfig: {
             temperature: 0.7,
-            maxOutputTokens: 4096,
+            maxOutputTokens: 2048,
           }
         }),
       }
@@ -87,7 +78,7 @@ Return ONLY valid JSON in this exact format:
     if (!response.ok) {
       const errorText = await response.text();
       console.error('Gemini API error:', response.status, errorText);
-      throw new Error('Failed to generate content');
+      throw new Error('Failed to regenerate slide');
     }
 
     const data = await response.json();
@@ -97,7 +88,7 @@ Return ONLY valid JSON in this exact format:
       throw new Error('No content received from Gemini');
     }
 
-    // Clean and extract JSON from response
+    // Clean and extract JSON
     let jsonString = contentText;
     jsonString = jsonString.replace(/```json\s*/gi, '').replace(/```\s*/g, '');
 
@@ -111,17 +102,17 @@ Return ONLY valid JSON in this exact format:
       .replace(/,\s*}/g, '}')
       .replace(/,\s*]/g, ']');
 
-    let content;
+    let slide;
     try {
-      content = JSON.parse(cleanedJson);
+      slide = JSON.parse(cleanedJson);
     } catch (parseError) {
       console.error('JSON parse error:', parseError, 'Raw JSON:', cleanedJson);
       throw new Error('Failed to parse AI response');
     }
 
-    return res.status(200).json({ content });
+    return res.status(200).json({ slide });
   } catch (error: unknown) {
-    console.error('Error in generate:', error);
+    console.error('Error in regenerate-slide:', error);
     const message = error instanceof Error ? error.message : 'An unexpected error occurred';
     return res.status(500).json({ error: message });
   }

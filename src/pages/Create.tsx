@@ -115,19 +115,30 @@ export default function Create() {
         })),
       };
 
-      // Try to invoke edge function to get actual content
-      const { data, error: fnError } = await supabase.functions.invoke("generate-ppt-content", {
-        body: {
-          topic: pres.topic,
-          slideCount: pres.slide_count - 1,
-          audienceType: pres.audience_type || "student",
-          mode: pres.mode,
-        },
-      });
-
-      if (!fnError && data?.content) {
-        setGeneratedContent(data.content);
-      } else {
+      // Try to call Vercel API to get actual content
+      try {
+        const response = await fetch("/api/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            topic: pres.topic,
+            slideCount: pres.slide_count - 1,
+            audienceType: pres.audience_type || "student",
+            mode: pres.mode,
+          }),
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data?.content) {
+            setGeneratedContent(data.content);
+          } else {
+            setGeneratedContent(placeholderContent);
+          }
+        } else {
+          setGeneratedContent(placeholderContent);
+        }
+      } catch {
         setGeneratedContent(placeholderContent);
       }
 
@@ -176,20 +187,24 @@ export default function Create() {
       if (presError) throw presError;
       setPresentationId(presData.id);
 
-      // Call edge function to generate content
-      const { data, error } = await supabase.functions.invoke("generate-ppt-content", {
-        body: {
+      // Call Vercel API to generate content
+      const response = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
           topic,
           slideCount: slideCount[0],
           audienceType,
           mode: "topic",
-        },
+        }),
       });
 
-      if (error) {
-        console.error("Edge function error:", error);
-        throw new Error(error.message || "Failed to generate content");
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Failed to generate content");
       }
+
+      const data = await response.json();
 
       if (!data || !data.content) {
         console.error("Invalid response data:", data);
@@ -284,20 +299,24 @@ export default function Create() {
       if (presError) throw presError;
       setPresentationId(presData.id);
 
-      const { data, error } = await supabase.functions.invoke("generate-ppt-content", {
-        body: {
+      const response = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
           topic,
           slideCount: sampleAnalysis.slideCount,
           audienceType: "professional",
           mode: "sample",
           sampleAnalysis,
-        },
+        }),
       });
 
-      if (error) {
-        console.error("Edge function error:", error);
-        throw new Error(error.message || "Failed to generate content");
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Failed to generate content");
       }
+
+      const data = await response.json();
 
       if (!data || !data.content) {
         console.error("Invalid response data:", data);
@@ -343,18 +362,23 @@ export default function Create() {
     setIsRegenerating(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke("regenerate-slide", {
-        body: {
+      const response = await fetch("/api/regenerate-slide", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
           currentSlide: generatedContent.slides[index],
           editPrompt: prompt,
           presentationTopic: topic,
           audienceType,
-        },
+        }),
       });
 
-      if (error) {
-        throw new Error(error.message || "Failed to regenerate slide");
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Failed to regenerate slide");
       }
+
+      const data = await response.json();
 
       if (!data || !data.slide) {
         throw new Error("No content received");
@@ -382,15 +406,19 @@ export default function Create() {
     const slide = generatedContent.slides[index];
 
     try {
-      const { data, error } = await supabase.functions.invoke("generate-slide-image", {
-        body: {
+      const response = await fetch("/api/generate-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
           slideTitle: slide.title,
           slideBullets: slide.bullets,
           presentationTopic: topic,
-        },
+        }),
       });
 
-      if (error || !data?.success) {
+      const data = await response.json();
+
+      if (!response.ok || !data?.success) {
         throw new Error("Failed to generate image");
       }
 
@@ -420,15 +448,19 @@ export default function Create() {
           continue;
         }
         
-        const { data, error } = await supabase.functions.invoke("generate-slide-image", {
-          body: {
+        const response = await fetch("/api/generate-image", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
             slideTitle: slide.title,
             slideBullets: slide.bullets,
             presentationTopic: topic,
-          },
+          }),
         });
+
+        const data = await response.json();
         
-        if (error || !data?.success) {
+        if (!response.ok || !data?.success) {
           console.error("Image generation failed for slide:", slide.title);
           slidesWithImages.push(slide); // Continue without image
         } else {
