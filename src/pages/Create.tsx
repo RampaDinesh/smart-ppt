@@ -105,47 +105,47 @@ export default function Create() {
       setAudienceType(pres.audience_type || "student");
       setPresentationId(pres.id);
 
-      // Try to regenerate content based on stored info
-      // For now, we'll create placeholder content from the presentation record
-      const placeholderContent: GeneratedContent = {
-        title: pres.title,
-        slides: Array.from({ length: pres.slide_count - 1 }, (_, i) => ({
-          title: `Slide ${i + 1}`,
-          bullets: ["Content will be regenerated on edit"],
+      // Always regenerate actual content - never use placeholders
+      const response = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          topic: pres.topic,
+          slideCount: pres.slide_count,
+          audienceType: pres.audience_type || "student",
+          mode: pres.mode,
+          sampleAnalysis: pres.sample_analysis,
+        }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Failed to regenerate content");
+      }
+
+      const data = await response.json();
+      
+      if (!data?.content || !data.content.slides || data.content.slides.length === 0) {
+        throw new Error("No content received from AI");
+      }
+
+      // Validate that all slides have real content
+      const validatedContent: GeneratedContent = {
+        title: data.content.title || pres.title,
+        slides: data.content.slides.map((slide: any, index: number) => ({
+          title: slide.title || `Slide ${index + 1}`,
+          bullets: Array.isArray(slide.bullets) && slide.bullets.length > 0
+            ? slide.bullets
+            : ["Key point about " + pres.topic],
+          imageUrl: slide.imageUrl,
         })),
       };
 
-      // Try to call Vercel API to get actual content
-      try {
-        const response = await fetch("/api/generate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            topic: pres.topic,
-            slideCount: pres.slide_count - 1,
-            audienceType: pres.audience_type || "student",
-            mode: pres.mode,
-          }),
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          if (data?.content) {
-            setGeneratedContent(data.content);
-          } else {
-            setGeneratedContent(placeholderContent);
-          }
-        } else {
-          setGeneratedContent(placeholderContent);
-        }
-      } catch {
-        setGeneratedContent(placeholderContent);
-      }
-
+      setGeneratedContent(validatedContent);
       setStep("overview");
     } catch (error) {
       console.error("Error loading presentation:", error);
-      toast.error("Failed to load presentation");
+      toast.error("Failed to load presentation. Please try again.");
       navigate("/dashboard");
     } finally {
       setLoadingPresentation(false);
@@ -206,12 +206,24 @@ export default function Create() {
 
       const data = await response.json();
 
-      if (!data || !data.content) {
+      if (!data || !data.content || !data.content.slides || data.content.slides.length === 0) {
         console.error("Invalid response data:", data);
         throw new Error("No content received from AI");
       }
 
-      setGeneratedContent(data.content);
+      // Validate all slides have proper content
+      const validatedContent: GeneratedContent = {
+        title: data.content.title || topic,
+        slides: data.content.slides.map((slide: any, index: number) => ({
+          title: slide.title || `Slide ${index + 1}`,
+          bullets: Array.isArray(slide.bullets) && slide.bullets.length > 0
+            ? slide.bullets
+            : ["Key point about " + topic],
+          imageUrl: slide.imageUrl,
+        })),
+      };
+
+      setGeneratedContent(validatedContent);
       setStep("overview");
       toast.success("Presentation generated! Review and edit your slides.");
     } catch (error: any) {
@@ -318,12 +330,24 @@ export default function Create() {
 
       const data = await response.json();
 
-      if (!data || !data.content) {
+      if (!data || !data.content || !data.content.slides || data.content.slides.length === 0) {
         console.error("Invalid response data:", data);
         throw new Error("No content received from AI");
       }
 
-      setGeneratedContent(data.content);
+      // Validate all slides have proper content
+      const validatedContent: GeneratedContent = {
+        title: data.content.title || topic,
+        slides: data.content.slides.map((slide: any, index: number) => ({
+          title: slide.title || `Slide ${index + 1}`,
+          bullets: Array.isArray(slide.bullets) && slide.bullets.length > 0
+            ? slide.bullets
+            : ["Key point about " + topic],
+          imageUrl: slide.imageUrl,
+        })),
+      };
+
+      setGeneratedContent(validatedContent);
       setStep("overview");
       toast.success("Presentation generated! Review and edit your slides.");
     } catch (error: any) {
